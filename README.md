@@ -1,0 +1,2 @@
+modifierShortcutsPanel_blender
+==============================
