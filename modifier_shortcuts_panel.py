@@ -30,7 +30,7 @@ import bpy
 from bpy.utils import register_module, unregister_module
 from bpy.props import IntProperty
 
-class Modifier_shortcuts_panel(bpy.types.Operator):
+class ModifierShortcuts(bpy.types.Operator):
     bl_label = "Modifier Shortcuts Panel"
     bl_idname = "object.modifier_shortcuts_panel"
     bl_description = "New panel in modifiers tab for quicker access to favorite modifiers"
@@ -66,19 +66,15 @@ class Modifier_shortcuts_panel(bpy.types.Operator):
     def execute(self, context):
         obj = bpy.context.object
         modifiers = list(bpy.context.scene.get(self.property_name, None))
-        
-        if not obj.modifiers:
-            # nothing to do
-            return {"FINISHED"}
-        
-        if self.mode in self.properties_dict:
+
+        if obj.modifiers and self.mode in self.properties_dict:
             self.toggle_for_all_modifiers( obj, self.properties_dict[self.mode])
         elif self.mode == self.MODE_APPLY:
             # apply
             while obj.modifiers:
                 bpy.ops.object.modifier_apply(apply_as='DATA', modifier = obj.modifiers[0].name)
         
-        elif self.mode == self.MODE_MANAGE:
+        elif obj.modifiers and self.mode == self.MODE_MANAGE:
             # manage
             name = obj.modifiers[0].type
             if name in modifiers:
@@ -87,10 +83,10 @@ class Modifier_shortcuts_panel(bpy.types.Operator):
                 modifiers.append(name)
             bpy.context.scene[self.property_name] = modifiers
                     
-        elif self.mode < len( modifiers):
+        elif self.mode >= 0 and self.mode < len( modifiers):
             # add selected modifier
             bpy.ops.object.modifier_add( type = modifiers[self.mode])
-        
+
         return {"FINISHED"}
 
     def toggle_for_all_modifiers( self, obj, attr_name):
@@ -98,40 +94,44 @@ class Modifier_shortcuts_panel(bpy.types.Operator):
         for mod in obj.modifiers:
             setattr(mod, attr_name, opt)
 
+class ModifierShortcutsPanel(bpy.types.Panel):
+    bl_label = "Modifier Shortcuts"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "modifier"
+    bl_options = {'HIDE_HEADER'}
 
-def menu_draw (self, context):
-    # TODO all should be in separate Panel
-    self.layout.operator_context = "INVOKE_DEFAULT"
-    layout = self.layout
-    row = layout.row(True)
-    
-    create_button = lambda text, icon: row.operator(Modifier_shortcuts_panel.bl_idname, icon = icon, text = text)
+    def draw(self, context):
+        self.layout.operator_context = "INVOKE_DEFAULT"
+        layout = self.layout
+        row = layout.row(True)
+        
+        create_button = lambda text, icon: row.operator(ModifierShortcuts.bl_idname, icon = icon, text = text)
 
-    create_button('', 'RESTRICT_RENDER_OFF').mode = Modifier_shortcuts_panel.MODE_SHOW_RENDER
-    create_button('', 'RESTRICT_VIEW_OFF')  .mode = Modifier_shortcuts_panel.MODE_SHOW_VIEWPORT
-    create_button('', 'EDITMODE_HLT')       .mode = Modifier_shortcuts_panel.MODE_SHOW_EDITMODE
-    create_button('', 'OUTLINER_DATA_MESH') .mode = Modifier_shortcuts_panel.MODE_SHOW_CAGE
-    row.separator()
-    create_button('Apply all', 'FILE_TICK') .mode = Modifier_shortcuts_panel.MODE_APPLY
-    create_button('Manage', 'NLA')          .mode = Modifier_shortcuts_panel.MODE_MANAGE
-    row = layout.row(True)
+        create_button('', 'RESTRICT_RENDER_OFF').mode = ModifierShortcuts.MODE_SHOW_RENDER        
+        create_button('', 'RESTRICT_VIEW_OFF')  .mode = ModifierShortcuts.MODE_SHOW_VIEWPORT
+        create_button('', 'EDITMODE_HLT')       .mode = ModifierShortcuts.MODE_SHOW_EDITMODE
+        create_button('', 'OUTLINER_DATA_MESH') .mode = ModifierShortcuts.MODE_SHOW_CAGE
+        row.separator()
+        create_button('Apply all', 'FILE_TICK') .mode = ModifierShortcuts.MODE_APPLY
+        create_button('Manage', 'NLA')          .mode = ModifierShortcuts.MODE_MANAGE
+        row = layout.row(True)
 
-    modifiers = bpy.context.scene.get( Modifier_shortcuts_panel.property_name, None)
-    if modifiers:
-        for i, m in enumerate( modifiers):
-            if i & 1 == 0 and i != 0:
-                # start new row
-                row = layout.row(True)
-            create_button( m, 'SPACE2').mode = i
-    row = layout.row(True)
+        modifiers = bpy.context.scene.get( ModifierShortcuts.property_name, None)
+        if modifiers:
+            for i, m in enumerate( modifiers):
+                if i & 1 == 0 and i != 0:
+                    # start new row
+                    row = layout.row(True)
+                create_button( m, 'SPACE2').mode = i
+        pass
+
 
 def register():
     register_module(__name__)
-    bpy.types.DATA_PT_modifiers.prepend(menu_draw)
     
 def unregister():
     unregister_module(__name__)
-    bpy.types.DATA_PT_modifiers.remove(menu_draw) 
 
 if __name__ == "__main__":
     register()
