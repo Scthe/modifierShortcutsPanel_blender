@@ -43,55 +43,36 @@ class Modifier_shortcuts_panel(bpy.types.Operator):
     MODE_SHOW_CAGE = -4
     MODE_APPLY = -5
     MODE_MANAGE = -6
+
+    properties_dict = {
+        MODE_SHOW_RENDER  : 'show_render',
+        MODE_SHOW_VIEWPORT: 'show_viewport',
+        MODE_SHOW_EDITMODE: 'show_in_editmode',
+        MODE_SHOW_CAGE    : 'show_on_cage'
+    }
+
     mode = IntProperty(name="mode", min = MODE_MANAGE, max = 20, default = 0)
     property_name = "common_used_modifiers"
     
     @classmethod
     def poll(cls, context):
-        #print('poll')
         return True
 
     def invoke(self, context, event):
-        print('invoke')
-        print(bpy.context.scene.get(self.property_name, None))
         if not bpy.context.scene.get(self.property_name, None):
-            bpy.context.scene[self.property_name] = []    
+            bpy.context.scene[self.property_name] = []
         return self.execute(context)
 
     def execute(self, context):
-        print('execute')
         obj = bpy.context.object
         modifiers = list(bpy.context.scene.get(self.property_name, None))
         
-        if not obj.modifiers: # TODO really ?
+        if not obj.modifiers:
             # nothing to do
             return {"FINISHED"}
         
-        # TODO use function toogle_all with setattr / getattr
-        if self.mode == self.MODE_SHOW_RENDER:
-            # show render
-            opt = not obj.modifiers[0].show_render
-            for mod in obj.modifiers:
-                mod.show_render = opt
-        
-        elif self.mode == self.MODE_SHOW_VIEWPORT:
-            # show viewport
-            opt = not obj.modifiers[0].show_viewport
-            for mod in obj.modifiers:
-                mod.show_viewport = opt
-        
-        elif self.mode == self.MODE_SHOW_EDITMODE:
-            # show edit mode
-            opt = not obj.modifiers[0].show_in_editmode
-            for mod in obj.modifiers:
-                mod.show_in_editmode = opt
-        
-        elif self.mode == self.MODE_SHOW_CAGE:
-            # show cage
-            opt = not obj.modifiers[0].show_on_cage
-            for mod in obj.modifiers:
-                mod.show_on_cage = opt
-        
+        if self.mode in self.properties_dict:
+            self.toggle_for_all_modifiers( obj, self.properties_dict[self.mode])
         elif self.mode == self.MODE_APPLY:
             # apply
             while obj.modifiers:
@@ -112,39 +93,41 @@ class Modifier_shortcuts_panel(bpy.types.Operator):
         
         return {"FINISHED"}
 
+    def toggle_for_all_modifiers( self, obj, attr_name):
+        opt = not getattr(obj.modifiers[0], attr_name)
+        for mod in obj.modifiers:
+            setattr(mod, attr_name, opt)
+
+
 def menu_draw (self, context):
+    # TODO all should be in separate Panel
     self.layout.operator_context = "INVOKE_DEFAULT"
     layout = self.layout
     row = layout.row(True)
     
-    # TODO write some lambda to encapsulate
-    # create_button = lambda _icon:     row.operator(Modifier_shortcuts_panel.bl_idname, icon =_icon
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='RESTRICT_RENDER_OFF').mode = Modifier_shortcuts_panel.MODE_SHOW_RENDER
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='RESTRICT_VIEW_OFF').mode = Modifier_shortcuts_panel.MODE_SHOW_VIEWPORT
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='EDITMODE_HLT').mode = Modifier_shortcuts_panel.MODE_SHOW_EDITMODE
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='OUTLINER_DATA_MESH').mode = Modifier_shortcuts_panel.MODE_SHOW_CAGE
+    create_button = lambda text, icon: row.operator(Modifier_shortcuts_panel.bl_idname, icon = icon, text = text)
+
+    create_button('', 'RESTRICT_RENDER_OFF').mode = Modifier_shortcuts_panel.MODE_SHOW_RENDER
+    create_button('', 'RESTRICT_VIEW_OFF')  .mode = Modifier_shortcuts_panel.MODE_SHOW_VIEWPORT
+    create_button('', 'EDITMODE_HLT')       .mode = Modifier_shortcuts_panel.MODE_SHOW_EDITMODE
+    create_button('', 'OUTLINER_DATA_MESH') .mode = Modifier_shortcuts_panel.MODE_SHOW_CAGE
     row.separator()
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='FILE_TICK', text=" Apply all").mode = Modifier_shortcuts_panel.MODE_APPLY
-    row.operator(Modifier_shortcuts_panel.bl_idname, icon ='NLA', text=" Manage").mode = Modifier_shortcuts_panel.MODE_MANAGE
+    create_button('Apply all', 'FILE_TICK') .mode = Modifier_shortcuts_panel.MODE_APPLY
+    create_button('Manage', 'NLA')          .mode = Modifier_shortcuts_panel.MODE_MANAGE
     row = layout.row(True)
-    
 
     modifiers = bpy.context.scene.get( Modifier_shortcuts_panel.property_name, None)
     if modifiers:
-        # TODO enumerate
-        for i in range( len(modifiers)):
-            if i & 1  == 0 and i != 0: # start new row
+        for i, m in enumerate( modifiers):
+            if i & 1 == 0 and i != 0:
+                # start new row
                 row = layout.row(True)
-            row.operator(Modifier_shortcuts_panel.bl_idname, icon ='SPACE2', text = modifiers[i] ).mode = i
+            create_button( m, 'SPACE2').mode = i
+    row = layout.row(True)
 
-    # TODO wtf ?
-    row = layout.row(True)
-    row = layout.row(True)
- 
 def register():
-    unregister()
     register_module(__name__)
-    bpy.types.DATA_PT_modifiers.prepend(menu_draw) # prepend / append !
+    bpy.types.DATA_PT_modifiers.prepend(menu_draw)
     
 def unregister():
     unregister_module(__name__)
